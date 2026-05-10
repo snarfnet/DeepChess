@@ -376,7 +376,8 @@ class ChessEngine {
         if isEP { capturedSq = sq(r, tc); capturedPiece = board[capturedSq] }
 
         undoStack.append(UndoInfo(move: move, capturedPiece: capturedPiece, capturedSquare: capturedSq,
-                                  prevCastling: castling, prevEnPassant: enPassantTarget, prevHalfMove: halfMoveClock))
+                                  prevCastling: castling, prevEnPassant: enPassantTarget, prevHalfMove: halfMoveClock,
+                                  prevLastMove: nil))
 
         if isEP { board[capturedSq] = nil }
 

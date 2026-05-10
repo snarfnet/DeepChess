@@ -1,15 +1,15 @@
 import Foundation
 
-enum PieceColor: Equatable {
+enum PieceColor: Equatable, Hashable {
     case white, black
     var opposite: PieceColor { self == .white ? .black : .white }
 }
 
-enum PieceType: Equatable {
+enum PieceType: Equatable, Hashable {
     case pawn, knight, bishop, rook, queen, king
 }
 
-struct Piece: Equatable {
+struct Piece: Equatable, Hashable {
     let color: PieceColor
     let type: PieceType
 
@@ -26,7 +26,7 @@ struct Piece: Equatable {
         case (.black, .rook): return "♜"
         case (.black, .bishop): return "♝"
         case (.black, .knight): return "♞"
-        case (.black, .pawn): return "♟︎"
+        case (.black, .pawn): return "♟"
         }
     }
 
@@ -42,14 +42,10 @@ struct Piece: Equatable {
     }
 }
 
-struct Move: Equatable {
+struct Move: Equatable, Hashable {
     let from: Int
     let to: Int
     var promotion: PieceType? = nil
-
-    static func == (lhs: Move, rhs: Move) -> Bool {
-        lhs.from == rhs.from && lhs.to == rhs.to && lhs.promotion == rhs.promotion
-    }
 }
 
 struct UndoInfo {
@@ -59,6 +55,7 @@ struct UndoInfo {
     let prevCastling: [Bool]
     let prevEnPassant: Int?
     let prevHalfMove: Int
+    let prevLastMove: Move? = nil
 }
 
 enum GameResult: Equatable {
@@ -442,7 +439,8 @@ class ChessGame: ObservableObject {
 
         undoStack.append(UndoInfo(
             move: move, capturedPiece: capturedPiece, capturedSquare: capturedSq,
-            prevCastling: castling, prevEnPassant: enPassantTarget, prevHalfMove: halfMoveClock
+            prevCastling: castling, prevEnPassant: enPassantTarget, prevHalfMove: halfMoveClock,
+            prevLastMove: lastMove
         ))
 
         if isEP { board[capturedSq] = nil }
@@ -531,6 +529,7 @@ class ChessGame: ObservableObject {
         castling = info.prevCastling
         enPassantTarget = info.prevEnPassant
         halfMoveClock = info.prevHalfMove
+        lastMove = info.prevLastMove
         turn = turn.opposite
     }
 }
