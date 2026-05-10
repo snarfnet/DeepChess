@@ -55,7 +55,7 @@ struct UndoInfo {
     let prevCastling: [Bool]
     let prevEnPassant: Int?
     let prevHalfMove: Int
-    let prevLastMove: Move? = nil
+    let prevLastMove: Move?
 }
 
 enum GameResult: Equatable {
