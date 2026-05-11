@@ -136,19 +136,45 @@ jobs:
           echo "Launch attempt $attempt failed, waiting..."
           sleep 5
         done
-        sleep 15
+
+        # Screenshot 1: Initial board (wait for full render)
+        sleep 25
         xcrun simctl io "$SIM67" screenshot screenshots/ss_67_1.png
+        echo "Screenshot 1: Initial board"
+
+        # Simulate taps to make a chess move (e4 pawn)
+        # iPhone 16 Pro Max: 1290x2796 logical, tap on e2 pawn area then e4
+        # Board is roughly centered, squares ~45pt each
+        # Tap a pawn (bottom area of screen)
+        xcrun simctl io "$SIM67" tap 645 1850 2>/dev/null || true
+        sleep 2
+        # Tap destination square
+        xcrun simctl io "$SIM67" tap 645 1670 2>/dev/null || true
+        sleep 8
+
+        # Screenshot 2: Game in progress (after move)
+        xcrun simctl io "$SIM67" screenshot screenshots/ss_67_2.png
+        echo "Screenshot 2: After first move"
+
+        # Make another move
+        xcrun simctl io "$SIM67" tap 520 1850 2>/dev/null || true
+        sleep 2
+        xcrun simctl io "$SIM67" tap 520 1670 2>/dev/null || true
+        sleep 8
+
+        # Screenshot 3: More game progress
+        xcrun simctl io "$SIM67" screenshot screenshots/ss_67_3.png
+        echo "Screenshot 3: Game in progress"
+
         xcrun simctl shutdown "$SIM67" || true
 
-        # 6.5-inch: resize from 6.7" (1290x2796 -> 1242x2688)
-        if [ -f screenshots/ss_67_1.png ]; then
-          sips -z 2688 1242 screenshots/ss_67_1.png --out screenshots/ss_65_1.png
-        fi
-
-        # 5.5-inch: resize from 6.7" (1290x2796 -> 1242x2208)
-        if [ -f screenshots/ss_67_1.png ]; then
-          sips -z 2208 1242 screenshots/ss_67_1.png --out screenshots/ss_55_1.png
-        fi
+        # Generate 6.5-inch and 5.5-inch from each 6.7-inch screenshot
+        for i in 1 2 3; do
+          if [ -f "screenshots/ss_67_${i}.png" ]; then
+            sips -z 2688 1242 "screenshots/ss_67_${i}.png" --out "screenshots/ss_65_${i}.png"
+            sips -z 2208 1242 "screenshots/ss_67_${i}.png" --out "screenshots/ss_55_${i}.png"
+          fi
+        done
 
         ls -la screenshots/
 
