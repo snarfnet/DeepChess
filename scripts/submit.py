@@ -1,4 +1,4 @@
-import jwt, time, requests, sys
+import jwt, time, requests, sys, os, glob
 
 KEY_ID = 'WDXGY9WX55'
 ISSUER = '2be0734f-943a-4d61-9dc9-5d9045c46fec'
@@ -84,16 +84,130 @@ print(f'Version ID: {version_id} state={version_state}')
 
 # Set "What's New"
 r = api('GET', f'/appStoreVersions/{version_id}/appStoreVersionLocalizations')
+loc_ids = {}
 if r.status_code == 200:
     for loc in r.json().get('data', []):
         loc_id = loc['id']
         locale = loc['attributes']['locale']
+        loc_ids[locale] = loc_id
         whats_new = '初回リリース' if locale.startswith('ja') else 'Initial release.'
         lr = api('PATCH', f'/appStoreVersionLocalizations/{loc_id}', json={
             'data': {'type': 'appStoreVersionLocalizations', 'id': loc_id,
                      'attributes': {'whatsNew': whats_new}}
         })
         print(f'WhatsNew {locale}: {lr.status_code}')
+
+# Upload screenshots
+SCREENSHOT_DIR = 'screenshots'
+DISPLAY_TYPES = {
+    'ss_67': 'APP_IPHONE_67',
+    'ss_65': 'APP_IPHONE_65',
+}
+
+if os.path.isdir(SCREENSHOT_DIR):
+    screenshot_files = glob.glob(os.path.join(SCREENSHOT_DIR, '*.png'))
+    print(f'Found {len(screenshot_files)} screenshots to upload')
+
+    for locale, loc_id in loc_ids.items():
+        # Get existing screenshot sets
+        r = api('GET', f'/appStoreVersionLocalizations/{loc_id}/appScreenshotSets')
+        existing_sets = {}
+        if r.status_code == 200:
+            for ss_set in r.json().get('data', []):
+                dt = ss_set['attributes']['screenshotDisplayType']
+                existing_sets[dt] = ss_set['id']
+
+        for prefix, display_type in DISPLAY_TYPES.items():
+            files = sorted([f for f in screenshot_files if os.path.basename(f).startswith(prefix)])
+            if not files:
+                continue
+
+            # Get or create screenshot set
+            set_id = existing_sets.get(display_type)
+            if set_id:
+                # Delete existing screenshots in this set
+                r = api('GET', f'/appScreenshotSets/{set_id}/appScreenshots')
+                if r.status_code == 200:
+                    for ss in r.json().get('data', []):
+                        dr = api('DELETE', f'/appScreenshots/{ss["id"]}')
+                        print(f'  Deleted old screenshot: {dr.status_code}')
+            else:
+                r = api('POST', '/appScreenshotSets', json={
+                    'data': {
+                        'type': 'appScreenshotSets',
+                        'attributes': {'screenshotDisplayType': display_type},
+                        'relationships': {
+                            'appStoreVersionLocalization': {
+                                'data': {'type': 'appStoreVersionLocalizations', 'id': loc_id}
+                            }
+                        }
+                    }
+                })
+                if r.status_code in (200, 201):
+                    set_id = r.json()['data']['id']
+                    print(f'Created screenshot set {display_type}: {set_id}')
+                else:
+                    print(f'Failed to create screenshot set {display_type}: {r.status_code} {r.text[:200]}')
+                    continue
+
+            # Upload each screenshot
+            for idx, fpath in enumerate(files):
+                fname = os.path.basename(fpath)
+                fsize = os.path.getsize(fpath)
+                print(f'Uploading {fname} ({fsize} bytes) to {display_type}...')
+
+                # Reserve upload
+                r = api('POST', '/appScreenshots', json={
+                    'data': {
+                        'type': 'appScreenshots',
+                        'attributes': {
+                            'fileName': fname,
+                            'fileSize': fsize
+                        },
+                        'relationships': {
+                            'appScreenshotSet': {
+                                'data': {'type': 'appScreenshotSets', 'id': set_id}
+                            }
+                        }
+                    }
+                })
+                if r.status_code not in (200, 201):
+                    print(f'  Reserve failed: {r.status_code} {r.text[:200]}')
+                    continue
+
+                ss_data = r.json()['data']
+                ss_id = ss_data['id']
+                upload_ops = ss_data['attributes'].get('uploadOperations', [])
+
+                # Upload parts
+                with open(fpath, 'rb') as f:
+                    file_data = f.read()
+
+                for op in upload_ops:
+                    url = op['url']
+                    offset = op['offset']
+                    length = op['length']
+                    req_headers = {h['name']: h['value'] for h in op['requestHeaders']}
+                    chunk = file_data[offset:offset+length]
+                    pr = requests.put(url, headers=req_headers, data=chunk)
+                    print(f'  Upload part offset={offset}: {pr.status_code}')
+
+                # Commit
+                import hashlib
+                md5 = hashlib.md5(file_data).hexdigest()
+                r = api('PATCH', f'/appScreenshots/{ss_id}', json={
+                    'data': {
+                        'type': 'appScreenshots',
+                        'id': ss_id,
+                        'attributes': {
+                            'uploaded': True,
+                            'sourceFileChecksum': md5
+                        }
+                    }
+                })
+                print(f'  Commit {fname}: {r.status_code}')
+
+        break  # Only upload for first locale (screenshots shared across locales in practice)
 
 # Assign build
 r = api('PATCH', f'/appStoreVersions/{version_id}/relationships/build',

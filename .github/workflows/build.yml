@@ -91,6 +91,52 @@ jobs:
           -authenticationKeyID WDXGY9WX55 \
           -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
 
+    - name: Capture Simulator Screenshots
+      run: |
+        set -e
+        mkdir -p screenshots
+
+        # Build for simulator
+        xcodebuild build \
+          -scheme DeepChess \
+          -configuration Debug \
+          -destination "platform=iOS Simulator,name=iPhone 16 Pro Max" \
+          -derivedDataPath build/sim \
+          CODE_SIGNING_ALLOWED=NO
+
+        APP_PATH=$(find build/sim -name "DeepChess.app" -path "*/Debug-iphonesimulator/*" | head -1)
+        echo "App: $APP_PATH"
+
+        # 6.7-inch screenshots (iPhone 16 Pro Max)
+        SIM67=$(xcrun simctl list devices available | grep "iPhone 16 Pro Max" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+        if [ -z "$SIM67" ]; then
+          SIM67=$(xcrun simctl create "Screenshot67" "iPhone 16 Pro Max")
+        fi
+        xcrun simctl boot "$SIM67" || true
+        sleep 5
+        xcrun simctl install "$SIM67" "$APP_PATH"
+        xcrun simctl launch "$SIM67" com.tokyonasu.DeepChess
+        sleep 8
+        xcrun simctl io "$SIM67" screenshot screenshots/ss_67_1.png
+        xcrun simctl shutdown "$SIM67" || true
+
+        # 6.5-inch screenshots (iPhone 15 Plus as fallback for 6.5")
+        SIM65=$(xcrun simctl list devices available | grep "iPhone 11 Pro Max" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
+        if [ -z "$SIM65" ]; then
+          # Resize 6.7" screenshot to 6.5" dimensions
+          sips -z 2688 1242 screenshots/ss_67_1.png --out screenshots/ss_65_1.png
+        else
+          xcrun simctl boot "$SIM65" || true
+          sleep 5
+          xcrun simctl install "$SIM65" "$APP_PATH"
+          xcrun simctl launch "$SIM65" com.tokyonasu.DeepChess
+          sleep 8
+          xcrun simctl io "$SIM65" screenshot screenshots/ss_65_1.png
+          xcrun simctl shutdown "$SIM65" || true
+        fi
+
+        ls -la screenshots/
+
     - name: Install PyJWT
       run: pip3 install --break-system-packages PyJWT requests
 
