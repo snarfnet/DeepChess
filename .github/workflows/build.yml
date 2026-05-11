@@ -92,6 +92,7 @@ jobs:
           -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
 
     - name: Capture Simulator Screenshots
+      continue-on-error: true
       run: |
         set -e
         mkdir -p screenshots
