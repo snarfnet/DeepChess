@@ -97,13 +97,22 @@ jobs:
         set -e
         mkdir -p screenshots
 
-        # Build for simulator (AdMob disabled via targetEnvironment(simulator))
+        # Build for simulator: remove GoogleMobileAds dependency (code already guarded by #if)
+        cp project.yml project_backup.yml
+        sed -i '' '/^packages:/,/from:/d' project.yml
+        sed -i '' '/- package: GoogleMobileAds/d' project.yml
+        xcodegen generate
+
         xcodebuild build \
           -scheme DeepChess \
           -configuration Debug \
           -destination "platform=iOS Simulator,name=iPhone 16 Pro Max" \
           -derivedDataPath build/sim \
           CODE_SIGNING_ALLOWED=NO
+
+        # Restore original project
+        mv project_backup.yml project.yml
+        xcodegen generate
 
         APP_PATH=$(find build/sim -name "DeepChess.app" -path "*/Debug-iphonesimulator/*" | head -1)
         echo "App: $APP_PATH"
@@ -119,7 +128,7 @@ jobs:
 
         # Launch with retry
         for attempt in 1 2 3; do
-          xcrun simctl launch "$SIM67" com.tokyonasu.DeepChess && break
+          xcrun simctl launch "$SIM67" com.amasaki.DeepChess && break
           echo "Launch attempt $attempt failed, waiting..."
           sleep 5
         done
