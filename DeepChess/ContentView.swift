@@ -89,10 +89,10 @@ struct ContentView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("DeepChess")
-                    .font(.system(size: 32, weight: .black, design: .rounded))
+                Text("放課後チェス倶楽部")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(pencil)
-                Text("放課後チェス部")
+                Text("After School Chess Club")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(rainyBlue)
             }
