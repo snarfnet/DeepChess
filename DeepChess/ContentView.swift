@@ -227,10 +227,11 @@ struct ContentView: View {
             }
 
             if let piece = game.board[index] {
-                Text(piece.displaySymbol)
-                    .font(.system(size: size * 0.68, weight: .regular, design: .serif))
-                    .foregroundStyle(piece.color == .white ? Color(red: 0.96, green: 0.89, blue: 0.66) : Color(red: 0.09, green: 0.11, blue: 0.12))
-                    .shadow(color: pencil.opacity(0.65), radius: 0, x: 1, y: 1)
+                ChessPieceView(
+                    pieceType: piece.type,
+                    isWhite: piece.color == .white,
+                    size: size
+                )
             }
 
             coordinateLabels(row: row, col: col, isLight: isLight)
