@@ -61,9 +61,26 @@ if data.get('data'):
     version_state = data['data'][0]['attributes']['appStoreState']
     print(f'Found version: {version_id} state={version_state}')
 
-if version_state in ('WAITING_FOR_REVIEW', 'IN_REVIEW'):
-    print(f'Already in review ({version_state}). Nothing to do.')
+screenshot_files = glob.glob(os.path.join('screenshots', '*.png')) if os.path.isdir('screenshots') else []
+has_screenshots = len(screenshot_files) > 0
+
+if version_state in ('WAITING_FOR_REVIEW', 'IN_REVIEW') and not has_screenshots:
+    print(f'Already in review ({version_state}) and no new screenshots. Nothing to do.')
     sys.exit(0)
+
+if version_state in ('WAITING_FOR_REVIEW', 'IN_REVIEW') and has_screenshots:
+    print(f'Cancelling review to upload {len(screenshot_files)} new screenshots...')
+    for state_filter in ['WAITING_FOR_REVIEW', 'IN_REVIEW']:
+        r = api('GET', f'/apps/{APP_ID}/reviewSubmissions?filter[state]={state_filter}')
+        if r.status_code == 200:
+            for sub in r.json().get('data', []):
+                sid = sub['id']
+                cr = api('PATCH', f'/reviewSubmissions/{sid}', json={
+                    'data': {'type': 'reviewSubmissions', 'id': sid, 'attributes': {'canceled': True}}
+                })
+                print(f'  Cancel {sid}: {cr.status_code}')
+    time.sleep(10)
+    version_state = 'PREPARE_FOR_SUBMISSION'
 
 if not version_id or version_state in ('READY_FOR_DISTRIBUTION', 'READY_FOR_SALE'):
     print('Creating new version...')
@@ -104,8 +121,7 @@ DISPLAY_TYPES = {
     'ss_65': 'APP_IPHONE_65',
 }
 
-if os.path.isdir(SCREENSHOT_DIR):
-    screenshot_files = glob.glob(os.path.join(SCREENSHOT_DIR, '*.png'))
+if has_screenshots:
     print(f'Found {len(screenshot_files)} screenshots to upload')
 
     for locale, loc_id in loc_ids.items():
