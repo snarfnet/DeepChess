@@ -127,19 +127,27 @@ jobs:
         sleep 5
         xcrun simctl install "$SIM67" "$APP_PATH"
 
+        # Dismiss any system dialogs (ATT etc)
+        xcrun simctl privacy "$SIM67" grant all com.amasaki.DeepChess 2>/dev/null || true
+
         # Launch with retry
         for attempt in 1 2 3; do
           xcrun simctl launch "$SIM67" com.amasaki.DeepChess && break
           echo "Launch attempt $attempt failed, waiting..."
           sleep 5
         done
-        sleep 10
+        sleep 15
         xcrun simctl io "$SIM67" screenshot screenshots/ss_67_1.png
         xcrun simctl shutdown "$SIM67" || true
 
         # 6.5-inch: resize from 6.7" (1290x2796 -> 1242x2688)
         if [ -f screenshots/ss_67_1.png ]; then
           sips -z 2688 1242 screenshots/ss_67_1.png --out screenshots/ss_65_1.png
+        fi
+
+        # 5.5-inch: resize from 6.7" (1290x2796 -> 1242x2208)
+        if [ -f screenshots/ss_67_1.png ]; then
+          sips -z 2208 1242 screenshots/ss_67_1.png --out screenshots/ss_55_1.png
         fi
 
         ls -la screenshots/

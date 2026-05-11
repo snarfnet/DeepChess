@@ -119,6 +119,7 @@ SCREENSHOT_DIR = 'screenshots'
 DISPLAY_TYPES = {
     'ss_67': 'APP_IPHONE_67',
     'ss_65': 'APP_IPHONE_65',
+    'ss_55': 'APP_IPHONE_55',
 }
 
 if has_screenshots:

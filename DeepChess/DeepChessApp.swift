@@ -17,8 +17,10 @@ struct DeepChessApp: App {
         WindowGroup {
             ContentView()
                 .task {
+                    #if !targetEnvironment(simulator)
                     try? await Task.sleep(for: .seconds(1))
                     ATTrackingManager.requestTrackingAuthorization { _ in }
+                    #endif
                 }
         }
     }
