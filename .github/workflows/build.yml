@@ -101,6 +101,7 @@ jobs:
         cp project.yml project_backup.yml
         sed -i '' '/^packages:/,/from:/d' project.yml
         sed -i '' '/- package: GoogleMobileAds/d' project.yml
+        sed -i '' '/^[[:space:]]*dependencies:$/d' project.yml
         xcodegen generate
 
         xcodebuild build \
