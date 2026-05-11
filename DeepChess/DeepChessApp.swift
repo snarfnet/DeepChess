@@ -1,20 +1,24 @@
 import SwiftUI
-import GoogleMobileAds
 import AppTrackingTransparency
+
+#if !targetEnvironment(simulator)
+import GoogleMobileAds
+#endif
 
 @main
 struct DeepChessApp: App {
     init() {
+        #if !targetEnvironment(simulator)
         GADMobileAds.sharedInstance().start(completionHandler: nil)
+        #endif
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        ATTrackingManager.requestTrackingAuthorization { _ in }
-                    }
+                .task {
+                    try? await Task.sleep(for: .seconds(1))
+                    ATTrackingManager.requestTrackingAuthorization { _ in }
                 }
         }
     }
