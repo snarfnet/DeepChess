@@ -15,14 +15,14 @@ private let redPencil = Color(red: 0.78, green: 0.32, blue: 0.24)
 @MainActor
 struct ContentView: View {
     @StateObject private var game = ChessGame()
+    @StateObject private var voicePlayer = CharacterVoicePlayer()
     @State private var showNewGame = false
     @State private var selectedOpponent: OpponentCharacter = .senpai
     @State private var showCoach = true
-    @State private var expressionOverride: FACSExpression?
     @State private var didStartDefaultOpponent = false
 
     private var expression: FACSExpression {
-        expressionOverride ?? FACSExpression.current(for: game)
+        voicePlayer.currentExpression ?? FACSExpression.current(for: game)
     }
 
     var body: some View {
@@ -35,9 +35,9 @@ struct ContentView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         header
+                        statusCard
                         opponentPoster
                         boardSection
-                        expressionStrip
                         if showCoach { coachCard }
                         controlsBar
                     }
@@ -57,7 +57,19 @@ struct ContentView: View {
             if !didStartDefaultOpponent {
                 didStartDefaultOpponent = true
                 game.newGame(asColor: .white, depth: selectedOpponent.depth)
+                voicePlayer.start(for: selectedOpponent)
             }
+        }
+        .onChange(of: selectedOpponent) { _, opponent in
+            voicePlayer.start(for: opponent)
+        }
+        .onChange(of: game.lastMove) { _, move in
+            guard let move else { return }
+            voicePlayer.playMoveLine(for: selectedOpponent, move: move, isPlayerTurn: game.turn == game.playerColor)
+        }
+        .onChange(of: game.result) { _, result in
+            guard result != .playing else { return }
+            voicePlayer.playResultLine(for: selectedOpponent, didPlayerWin: game.turn != game.playerColor)
         }
     }
 
@@ -116,49 +128,75 @@ struct ContentView: View {
     }
 
     private var opponentPoster: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image(selectedOpponent.assetName(for: expression))
-                .resizable()
-                .scaledToFill()
-                .frame(height: 226)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .overlay(
-                    LinearGradient(
-                        colors: [.clear, paper.opacity(0.10), paper.opacity(0.60)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.48), lineWidth: 2))
+        VStack(alignment: .leading, spacing: 10) {
+            AnimatedCharacterPortrait(
+                imageName: selectedOpponent.assetName(for: expression),
+                isSpeaking: voicePlayer.isSpeaking,
+                isThinking: game.isThinking
+            )
+            .frame(height: 230)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.48), lineWidth: 2))
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 9, height: 9)
-                Text(statusText)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(pencil)
-                }
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
                 Text(expression.name)
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(pencil)
                 Text("\(selectedOpponent.role)・\(selectedOpponent.strength)  \(selectedOpponent.name)")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(rainyBlue)
-                Text("\(expression.code)  \(expression.note)")
+                Text(expression.note)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(pencil.opacity(0.72))
+                }
+
+                Spacer(minLength: 0)
+
+                if voicePlayer.isSpeaking {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(redPencil)
+                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                }
             }
-            .padding(13)
-            .background(paperLight.opacity(0.88), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.28), lineWidth: 1.2))
-            .padding(12)
+
+            if let line = voicePlayer.currentLine {
+                Text("「\(line.text)」")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(pencil)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(yellowTape.opacity(0.34), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
         }
+        .padding(12)
+        .background(paperLight.opacity(0.88), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.28), lineWidth: 1.2))
         .overlay(alignment: .topLeading) { tape(width: 96).offset(x: 18, y: -7) }
         .overlay(alignment: .topTrailing) { tape(width: 96).offset(x: -18, y: -7) }
+    }
+
+    private var statusCard: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 11, height: 11)
+            Text(statusText)
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(pencil)
+            Spacer()
+            Text(AICoach.shortStatus(for: game))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(pencil.opacity(0.68))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(paperLight.opacity(0.86), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.30), lineWidth: 1.5))
     }
 
     private var boardSection: some View {
@@ -183,13 +221,20 @@ struct ContentView: View {
     private func boardView(size: CGFloat) -> some View {
         let sqSize = size / 8
         return VStack(spacing: 0) {
-            ForEach((0..<8).reversed(), id: \.self) { row in
-                HStack(spacing: 0) {
-                    ForEach(0..<8, id: \.self) { col in
-                        let displayRow = game.playerColor == .white ? row : 7 - row
-                        let displayCol = game.playerColor == .white ? col : 7 - col
-                        let index = displayRow * 8 + displayCol
-                        squareView(index: index, row: displayRow, col: displayCol, size: sqSize)
+            ZStack {
+                Image("ChessBoardImage")
+                    .resizable()
+                    .scaledToFill()
+                VStack(spacing: 0) {
+                    ForEach((0..<8).reversed(), id: \.self) { row in
+                        HStack(spacing: 0) {
+                            ForEach(0..<8, id: \.self) { col in
+                                let displayRow = game.playerColor == .white ? row : 7 - row
+                                let displayCol = game.playerColor == .white ? col : 7 - col
+                                let index = displayRow * 8 + displayCol
+                                squareView(index: index, row: displayRow, col: displayCol, size: sqSize)
+                            }
+                        }
                     }
                 }
             }
@@ -208,7 +253,7 @@ struct ContentView: View {
 
         return ZStack {
             Rectangle()
-                .fill(isLight ? paperLight : rainyBlue.opacity(0.62))
+                .fill(Color.clear)
 
             if isLastMove { Rectangle().fill(yellowTape.opacity(0.48)) }
             if isKingCheck { Rectangle().fill(redPencil.opacity(0.36)) }
@@ -232,6 +277,10 @@ struct ContentView: View {
                     isWhite: piece.color == .white,
                     size: size
                 )
+                .scaleEffect(isLastMove ? 1.12 : 1.0)
+                .rotationEffect(.degrees(isLastMove ? 2.5 : 0))
+                .shadow(color: isLastMove ? yellowTape.opacity(0.70) : .clear, radius: 8)
+                .animation(.spring(response: 0.28, dampingFraction: 0.62), value: game.lastMove)
             }
 
             coordinateLabels(row: row, col: col, isLight: isLight)
@@ -239,7 +288,6 @@ struct ContentView: View {
         .frame(width: size, height: size)
         .contentShape(Rectangle())
         .onTapGesture {
-            expressionOverride = nil
             game.tapSquare(index)
         }
     }
@@ -261,43 +309,6 @@ struct ContentView: View {
                     .padding(3)
             }
         }
-    }
-
-    private var expressionStrip: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("\(selectedOpponent.role)の表情")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(pencil)
-                Spacer()
-                Button("自動") { expressionOverride = nil }
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(rainyBlue)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    ForEach(FACSExpression.all) { item in
-                        Button {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                                expressionOverride = item
-                            }
-                        } label: {
-                            Text("\(item.id)")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle((expressionOverride ?? expression).id == item.id ? paperLight : pencil)
-                                .frame(width: 32, height: 30)
-                                .background((expressionOverride ?? expression).id == item.id ? pencil : paperLight, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(pencil.opacity(0.32), lineWidth: 1))
-                        }
-                        .accessibilityLabel(item.name)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(paperLight.opacity(0.75), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.24), lineWidth: 1.5))
     }
 
     private var coachCard: some View {
@@ -341,7 +352,6 @@ struct ContentView: View {
             }
 
             Button {
-                expressionOverride = nil
                 game.newGame(asColor: game.playerColor, depth: selectedOpponent.depth)
             } label: {
                 Image(systemName: "arrow.clockwise")
@@ -445,7 +455,6 @@ struct ContentView: View {
                         .multilineTextAlignment(.center)
 
                     Button {
-                        expressionOverride = nil
                         game.newGame(asColor: game.playerColor, depth: selectedOpponent.depth)
                     } label: {
                         Text("もう一局")
@@ -525,7 +534,6 @@ struct ContentView: View {
     private func opponentButton(_ opponent: OpponentCharacter) -> some View {
         Button {
             selectedOpponent = opponent
-            expressionOverride = nil
         } label: {
             HStack(spacing: 12) {
                 Image(opponent.assetName(for: FACSExpression.all[0]))
@@ -561,7 +569,6 @@ struct ContentView: View {
     private func colorButton(color: PieceColor, title: String, subtitle: String) -> some View {
         Button {
             showNewGame = false
-            expressionOverride = nil
             game.newGame(asColor: color, depth: selectedOpponent.depth)
         } label: {
             VStack(spacing: 8) {
@@ -579,6 +586,51 @@ struct ContentView: View {
             .background(color == .white ? paperLight : rainyBlue.opacity(0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(pencil.opacity(0.36), lineWidth: 1.5))
         }
+    }
+}
+
+private struct AnimatedCharacterPortrait: View {
+    let imageName: String
+    let isSpeaking: Bool
+    let isThinking: Bool
+
+    @State private var idle = false
+
+    var body: some View {
+        ZStack {
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .scaleEffect(isSpeaking ? 1.035 : 1.0)
+                .offset(y: idle ? -5 : 4)
+                .rotationEffect(.degrees(idle ? -0.8 : 0.8))
+                .animation(.easeInOut(duration: isThinking ? 1.1 : 1.7).repeatForever(autoreverses: true), value: idle)
+                .animation(.spring(response: 0.22, dampingFraction: 0.58), value: isSpeaking)
+
+            LinearGradient(
+                colors: [.clear, paper.opacity(0.10), paper.opacity(0.58)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            if isSpeaking {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        ForEach(0..<4, id: \.self) { index in
+                            Capsule()
+                                .fill(redPencil.opacity(0.78))
+                                .frame(width: 5, height: CGFloat(12 + index * 5))
+                                .scaleEffect(y: idle ? 1.35 : 0.55, anchor: .bottom)
+                        }
+                    }
+                    .padding(.bottom, 14)
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .clipped()
+        .onAppear { idle = true }
     }
 }
 
