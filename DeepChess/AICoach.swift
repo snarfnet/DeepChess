@@ -2,6 +2,16 @@ import Foundation
 
 @MainActor
 struct AICoach {
+    static func shortStatus(for game: ChessGame) -> String {
+        if game.isThinking { return "相手が読み筋を探しています" }
+        if game.isCheck { return "王の安全を最優先" }
+        if game.result != .playing { return "対局が終わりました" }
+        if let move = game.lastMove {
+            return "直前の手: \(squareName(move.from)) → \(squareName(move.to))"
+        }
+        return "中央を取ると指しやすいです"
+    }
+
     static func insight(for game: ChessGame) -> String {
         if game.isThinking {
             return "相手が考え中です。中央、王の安全、次に取られそうな駒を見ています。"

@@ -21,6 +21,8 @@ targets:
     platform: iOS
     sources:
       - path: DeepChess
+    resources:
+      - path: DeepChess/Resources
     info:
       path: DeepChess/Info.plist
       properties:
