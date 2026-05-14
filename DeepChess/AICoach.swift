@@ -46,7 +46,7 @@ struct AICoach {
         return "序盤は中央を取り、ナイトとビショップを外へ出すと指しやすいです。"
     }
 
-    static func squareName(_ index: Int) -> String {
+    nonisolated static func squareName(_ index: Int) -> String {
         let files = ["a", "b", "c", "d", "e", "f", "g", "h"]
         return "\(files[index % 8])\(index / 8 + 1)"
     }
