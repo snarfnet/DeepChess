@@ -107,7 +107,7 @@ if r.status_code == 200:
         loc_id = loc['id']
         locale = loc['attributes']['locale']
         loc_ids[locale] = loc_id
-        whats_new = '初回リリース' if locale.startswith('ja') else 'Initial release.'
+        whats_new = '広告をなくして、買い切りにしました。対局に集中できます。' if locale.startswith('ja') else 'Removed ads and switched to a one-time purchase. Enjoy focused play.'
         lr = api('PATCH', f'/appStoreVersionLocalizations/{loc_id}', json={
             'data': {'type': 'appStoreVersionLocalizations', 'id': loc_id,
                      'attributes': {'whatsNew': whats_new}}

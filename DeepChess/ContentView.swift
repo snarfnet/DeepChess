@@ -1,8 +1,5 @@
 import SwiftUI
 
-private let topAdUnitID = "ca-app-pub-9404799280370656/3426466078"
-private let bottomAdUnitID = "ca-app-pub-9404799280370656/3426466078"
-
 private let paper = Color(red: 0.96, green: 0.91, blue: 0.78)
 private let paperLight = Color(red: 1.00, green: 0.97, blue: 0.84)
 private let pencil = Color(red: 0.25, green: 0.30, blue: 0.33)
@@ -29,9 +26,6 @@ struct ContentView: View {
         ZStack {
             posterBackground
             VStack(spacing: 0) {
-                AdBannerView(adUnitID: topAdUnitID)
-                    .frame(height: 50)
-
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         header
@@ -45,9 +39,6 @@ struct ContentView: View {
                     .padding(.top, 10)
                     .padding(.bottom, 18)
                 }
-
-                AdBannerView(adUnitID: bottomAdUnitID)
-                    .frame(height: 50)
             }
         }
         .overlay { promotionOverlay }
